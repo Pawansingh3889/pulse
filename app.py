@@ -188,12 +188,160 @@ st.markdown("""
 st.title("Pulse")
 st.caption("Tech. Military. Politics. Football. Hiking. All local. All private.")
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-    "Tech News", "Military & Defense", "World Politics", "Football", "Hiking & Travel", "Ask AI"
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+    "Yorkshire", "Tech News", "Military & Defense", "World Politics", "Football", "Hiking & Travel", "Ask AI"
 ])
 
-# ── TAB 1: Tech ──
+# ── TAB 0: Yorkshire ──
 with tab1:
+    from uk_data import (get_weather, get_yorkshire_demographics, get_yorkshire_finance,
+                         get_gov_schemes, get_housing_data, get_election_results,
+                         get_school_data, get_jobs_exams)
+
+    st.subheader("Yorkshire & Nearby — Live Data")
+
+    # Weather
+    st.markdown("#### Weather")
+    wcol1, wcol2, wcol3 = st.columns(3)
+    locations = ["York", "Leeds", "Sheffield", "Harrogate", "Scarborough", "Hull",
+                 "Bradford", "Whitby", "Middlesbrough", "Wakefield", "Huddersfield", "Doncaster"]
+    selected = st.multiselect("Select locations", locations, default=["York", "Leeds", "Sheffield"])
+
+    for loc in selected:
+        w = get_weather(loc)
+        if "error" not in w:
+            st.markdown(f"""
+            <div class="score-card">
+                <span style="color: #60a5fa; font-weight: 700; font-size: 16px;">{w['location']}</span>
+                <span style="color: white; font-size: 24px; font-weight: 700; margin-left: 16px;">{w['temp']}C</span>
+                <span style="color: #94a3b8; margin-left: 8px;">{w['condition']}</span>
+                <span style="color: #64748b; margin-left: 16px;">Humidity: {w['humidity']}% | Wind: {w['wind']} km/h</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # 7-day forecast
+            if w.get("forecast"):
+                cols = st.columns(7)
+                for i, f in enumerate(w["forecast"]):
+                    with cols[i]:
+                        st.metric(f["date"][5:], f"{f['max']}C", f"{f['rain']}mm rain")
+
+    st.divider()
+
+    # Population
+    st.markdown("#### Population & Demographics")
+    demo = get_yorkshire_demographics()
+    d1, d2, d3, d4 = st.columns(4)
+    d1.metric("Population", f"{demo['population']['total']:,}")
+    d2.metric("Employment Rate", demo['employment_rate'])
+    d3.metric("Median Salary", f"GBP {demo['median_salary']:,}")
+    d4.metric("Literacy Rate", demo['literacy_rate'].split('(')[0])
+
+    st.markdown("**City Populations**")
+    pop_data = demo['population']['cities']
+    cols = st.columns(4)
+    for i, (city, pop) in enumerate(sorted(pop_data.items(), key=lambda x: -x[1])):
+        with cols[i % 4]:
+            st.metric(city, f"{pop:,}")
+
+    st.divider()
+
+    # Finance
+    st.markdown("#### Council Budgets & Spending")
+    finance = get_yorkshire_finance()
+    for council in finance['councils']:
+        with st.expander(f"{council['name']} — Budget: GBP {council['budget_2024_25']} | Council Tax Band D: GBP {council['council_tax_band_d']:,}"):
+            for area, pct in council['key_spend'].items():
+                st.write(f"- {area.replace('_', ' ').title()}: **{pct}**")
+
+    st.divider()
+
+    # Housing
+    st.markdown("#### Housing Market")
+    housing = get_housing_data()
+    h_cols = st.columns(4)
+    for i, (area, price) in enumerate(sorted(housing['average_prices'].items(), key=lambda x: -x[1])):
+        with h_cols[i % 4]:
+            diff = price - housing['average_prices'].get('UK Average', 295000)
+            st.metric(area, f"GBP {price:,}", f"{diff:+,} vs UK avg" if area != "UK Average" else "")
+
+    if housing.get('council_housing_waiting_list'):
+        st.markdown("**Council Housing Waiting List**")
+        wl_cols = st.columns(4)
+        for i, (city, count) in enumerate(housing['council_housing_waiting_list'].items()):
+            with wl_cols[i % 4]:
+                st.metric(city, f"{count:,} families")
+
+    st.divider()
+
+    # Government Schemes
+    st.markdown("#### Government Schemes & Benefits")
+    schemes = get_gov_schemes()
+    for s in schemes:
+        st.markdown(f"""
+        <div class="news-card">
+            <a href="{s['link']}" target="_blank" style="color: #60a5fa; text-decoration: none; font-weight: 600;">{s['name']}</a>
+            <br><span style="color: #94a3b8; font-size: 12px;">{s['who']}</span>
+            <br><span style="color: #22c55e; font-weight: 600;">GBP {s['amount']}</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.divider()
+
+    # Elections
+    st.markdown("#### Election Results")
+    elections = get_election_results()
+    ge = elections['general_election_2024']
+    st.markdown(f"**General Election {ge['date']}** — {ge['yorkshire_summary']}")
+    for r in ge['yorkshire_results']:
+        color = {"Labour": "#e11d48", "Conservative": "#2563eb", "Independent": "#8b5cf6", "Green": "#22c55e"}.get(r['party'], "#64748b")
+        st.markdown(f"""
+        <div style="display: flex; align-items: center; padding: 4px 0;">
+            <span style="width: 12px; height: 12px; border-radius: 50%; background: {color}; margin-right: 8px;"></span>
+            <span style="color: white; width: 220px;">{r['constituency']}</span>
+            <span style="color: #94a3b8; width: 180px;">{r['winner']}</span>
+            <span style="color: {color}; font-weight: 600; width: 120px;">{r['party']}</span>
+            <span style="color: #64748b;">Majority: {r['majority']:,}</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.divider()
+
+    # Schools
+    st.markdown("#### Schools & Education")
+    schools = get_school_data()
+    s_cols = st.columns(5)
+    s_cols[0].metric("Total Schools", f"{schools['stats']['total_schools_yorkshire']:,}")
+    s_cols[1].metric("Primary", f"{schools['stats']['primary']:,}")
+    s_cols[2].metric("Secondary", f"{schools['stats']['secondary']:,}")
+    s_cols[3].metric("Outstanding", schools['ofsted_ratings_yorkshire']['outstanding'])
+    s_cols[4].metric("Good", schools['ofsted_ratings_yorkshire']['good'])
+
+    st.markdown("**Universities**")
+    st.write(" | ".join(schools['stats']['universities']))
+
+    st.divider()
+
+    # Jobs & Exams
+    st.markdown("#### Jobs & Exams")
+    je = get_jobs_exams()
+
+    j_col1, j_col2 = st.columns(2)
+    with j_col1:
+        st.markdown("**Job Sites**")
+        for j in je['job_sites']:
+            st.markdown(f"- [{j['name']}]({j['url']}) — {j['focus']}")
+
+    with j_col2:
+        st.markdown("**Upcoming Exams & Certifications**")
+        for e in je['upcoming_exams']:
+            st.markdown(f"- [{e['exam']}]({e['url']}) — {e.get('deadline', e.get('type', ''))}")
+
+    st.markdown("**Major Employers in Yorkshire**")
+    st.write(" | ".join(je['major_employers_yorkshire']))
+
+# ── TAB: Tech ──
+with tab2:
     st.subheader("Tech News (Hacker News)")
     if st.button("Refresh Tech", key="tech"):
         st.rerun()
@@ -209,8 +357,8 @@ with tab1:
     else:
         st.info("Could not fetch news. Check internet connection.")
 
-# ── TAB 2: Military ──
-with tab2:
+# ── TAB: Military ──
+with tab3:
     st.subheader("Military & Defense")
     if st.button("Refresh Military", key="mil"):
         st.rerun()
@@ -226,8 +374,8 @@ with tab2:
     else:
         st.info("Could not fetch military news.")
 
-# ── TAB 3: Politics ──
-with tab3:
+# ── TAB: Politics ──
+with tab4:
     st.subheader("World Politics")
     if st.button("Refresh Politics", key="pol"):
         st.rerun()
@@ -243,8 +391,8 @@ with tab3:
     else:
         st.info("Could not fetch political news.")
 
-# ── TAB 4: Football ──
-with tab4:
+# ── TAB: Football ──
+with tab5:
     st.subheader("EPL & Champions League")
     if st.button("Refresh Scores", key="foot"):
         st.rerun()
@@ -260,8 +408,8 @@ with tab4:
     else:
         st.info("No matches today. Check back on matchday.")
 
-# ── TAB 5: Hiking & Travel ──
-with tab5:
+# ── TAB: Hiking & Travel ──
+with tab6:
     col1, col2 = st.columns(2)
 
     with col1:
@@ -303,8 +451,8 @@ with tab5:
             </div>
             """, unsafe_allow_html=True)
 
-# ── TAB 6: Ask AI ──
-with tab6:
+# ── TAB: Ask AI ──
+with tab7:
     st.subheader("Ask Anything (Local AI)")
     st.caption(f"Powered by {MODEL} via Ollama. Everything stays on your machine.")
 
